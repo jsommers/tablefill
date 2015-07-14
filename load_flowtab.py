@@ -80,15 +80,15 @@ class rule_loader (EventMixin):
 
         elif self.state == "Removing":
             while len(self.mods):
-                i = random.randint(0, len(mods)-1)        
+                i = random.randint(0, len(self.mods)-1)        
                 msg = self.mods.pop(i)
                 msg.command = of.OFPFC_DELETE
                 event.connection.send(msg)
-                if len(mods) % 25:
-                    log.debug("Remaining mods to remove: {}".format(len(mods)))
+                if len(self.mods) % 25:
+                    log.debug("Remaining mods to remove: {}".format(len(self.mods)))
      
     def _handle_FlowRemoved(self, event):
-        log.info("Flow removed from switch: {}".format(event.asString()))
+        log.info("Flow removed from switch: {}".format(event))
 
     def _handle_ErrorIn(self, event):
         log.info("Got error from switch: {}".format(event.asString()))
