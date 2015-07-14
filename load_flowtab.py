@@ -51,13 +51,13 @@ class rule_loader (EventMixin):
             self.mods = []
 
             for i in range(5000):
-                prio = 0xff00 - i
                 msg = of.ofp_flow_mod()
-                msg.priority = prio
+                msg.priority = random.randint(0x8000, 0xffff)
                 msg.command = of.OFPFC_ADD
 
                 matcher = of.ofp_match()
                 matcher.dl_type = 0x0800
+                matcher.nw_src = IPAddr(random.randint(1,2**32-1))
                 matcher.nw_dst = '10.{}.{}.0/24'.format(i/256, i%256)
 
                 msg.match = matcher
