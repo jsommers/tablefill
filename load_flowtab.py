@@ -12,6 +12,7 @@ import pox.openflow.libopenflow_01 as of
 from pox.lib.revent import *
 
 import time
+import random
 
 def dpid_to_mac (dpid):
   return EthAddr("%012x" % (dpid & 0xffFFffFFffFF,))
@@ -33,29 +34,58 @@ class rule_loader (EventMixin):
     msg = of.ofp_flow_mod(command=of.OFPFC_DELETE)
     event.connection.send(msg)
 
+    msg = of.ofp_barrier_request()
+    event.connection.send(msg)
+
+    self.state = "Loading"
+
     # event.connection.features
     # event.connection.ports
     # print "ports:",event.connection.ports
     # print "ports:",event.connection.features
-    for i in range(1000):
-      prio = 0xff00 - i
-      msg = of.ofp_flow_mod()
-      msg.priority = prio
-      msg.command = OFPFC_ADD
 
-      matcher = of.ofp_match()
-      matcher.dl_type = 0x0800
-      matcher.nw_dst = '10.{}.{}.0/24'.format(i/256, i%256)
+  def _handle_BarrierIn(self, event):
+    log.debug("Got barrier.")
 
-      msg.match = matcher
-      # msg.idle_timeout = OFP_FLOW_PERMANENT
-      msg.hard_timeout = OFP_FLOW_PERMANENT
-      msg.buffer_id = None
-      msg.flags = OFPFF_CHECK_OVERLAP | OFPFF_SEND_FLOW_REM 
+    if self.state == "Loading":
+      self.mods = []
 
-      msg.actions.append(of.ofp_action_output(port = 13))
-      self.connection.send(msg)
+      for i in range(5000):
+        prio = 0xff00 - i
+        msg = of.ofp_flow_mod()
+        msg.priority = prio
+        msg.command = of.OFPFC_ADD
 
+        matcher = of.ofp_match()
+        matcher.dl_type = 0x0800
+        matcher.nw_dst = '10.{}.{}.0/24'.format(i/256, i%256)
+
+        msg.match = matcher
+        # msg.idle_timeout = OFP_FLOW_PERMANENT
+        msg.hard_timeout = of.OFP_FLOW_PERMANENT
+        msg.buffer_id = None
+        msg.flags = of.OFPFF_CHECK_OVERLAP | of.OFPFF_SEND_FLOW_REM 
+
+        msg.actions.append(of.ofp_action_output(port = 13))
+        self.mods.append(msg)
+        event.connection.send(msg)
+        if i % 100 == 0:
+          log.debug("Sent mod message {}".format(i))
+          time.sleep(1)
+
+      self.state = "Removing"
+      msg = of.ofp_barrier_request()
+      event.connection.send(msg)
+      log.debug("Sending post-add barrier")
+
+    elif self.state = "Removing":
+      while len(self.mods):
+        i = random.randint(0, len(mods)-1)        
+        msg = self.mods.pop(i)
+        msg.command = of.OFPFC_DELETE
+        event.connection.send(msg)
+        if len(mods) % 25:
+          log.debug("Remaining mods to remove: {}".format(len(mods)))
  
   def _handle_FlowRemoved(self, event):
     log.info("Flow removed from switch: {}".format(event.asString()))
